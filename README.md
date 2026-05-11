@@ -1,49 +1,49 @@
 # PCVRHyFormer
 
-A hybrid Transformer model for **Post-Click Conversion Rate (PCVR)** prediction. Combines Non-Sequence (NS) feature tokenization with multi-domain sequence encoding via stacked `MultiSeqHyFormerBlock` layers.
+一个用于**点击后转化率预测（Post-Click Conversion Rate, PCVR）**的混合 Transformer 模型。通过堆叠的 `MultiSeqHyFormerBlock` 层，将非序列（NS）特征 tokenize 与多域序列编码相结合。
 
-## Model Architecture
+## 模型架构
 
 ```
-Input Features
-├── User Int Features ──→ NS Tokenizer ──→ user NS tokens
-├── User Dense Features ────────────────→ user dense token
-├── Item Int Features ──→ NS Tokenizer ──→ item NS tokens
-├── Item Dense Features ────────────────→ item dense token
-└── Sequences (seq_a/b/c/d)
-    ├── Sequence Embedding + Time Bucket
-    └── Seq Encoder (Transformer / SwiGLU / Longer)
-        └── Cross-Attention with Query tokens
+输入特征
+├── 用户整数特征 ──→ NS Tokenizer ──→ 用户 NS tokens
+├── 用户稠密特征 ────────────────→ 用户稠密 token
+├── 物品整数特征 ──→ NS Tokenizer ──→ 物品 NS tokens
+├── 物品稠密特征 ────────────────→ 物品稠密 token
+└── 行为序列 (seq_a/b/c/d)
+    ├── 序列 Embedding + 时间桶
+    └── 序列编码器 (Transformer / SwiGLU / Longer)
+        └── 与 Query tokens 做交叉注意力
             ↓
     MultiSeqHyFormerBlock × N
     (NS tokens + Query tokens → RankMixer → Self-Attention → FFN)
             ↓
-    Classifier → P(conversion)
+    分类器 → P(转化)
 ```
 
-**Key components:**
+**核心组件：**
 
-- **NS Tokenizer**: Two variants — `group` (project each feature group to one token) or `rankmixer` (concatenate all embeddings, split into equal-size chunks)
-- **Sequence Encoder**: Three variants — `transformer` (standard self-attention), `swiglu` (SwiGLU without attention), `longer` (Top-K compressed encoder)
-- **RoPE**: Optional Rotary Position Embedding for sequence attention
-- **RankMixer**: Token mixing block with per-token FFN
-- **Dual Optimizer**: Adagrad for sparse Embeddings, AdamW for dense parameters
-- **Early Stopping**: Monitors validation AUC
+- **NS Tokenizer**：两种变体 —— `group`（将每个特征组投影为一个 token）或 `rankmixer`（拼接所有 embedding 后等分切块）
+- **序列编码器**：三种变体 —— `transformer`（标准自注意力）、`swiglu`（无注意力的 SwiGLU）、`longer`（Top-K 压缩编码器）
+- **RoPE**：可选的旋转位置编码，用于序列注意力
+- **RankMixer**：Token 混合模块，包含逐 token 的 FFN
+- **双重优化器**：稀疏 Embedding 使用 Adagrad，稠密参数使用 AdamW
+- **早停机制**：监控验证集 AUC
 
-## Project Structure
+## 项目结构
 
 ```
-├── model.py          # Model definition (PCVRHyFormer, RoPE, SwiGLU, etc.)
-├── dataset.py        # Parquet dataset loader with IterableDataset
-├── trainer.py        # Training loop with dual optimizer & early stopping
-├── train.py          # Training entry point with CLI argument parsing
-├── utils.py          # Utilities (seed, EarlyStopping, logging, focal loss)
-├── ns_groups.json    # Example NS feature grouping config
-├── run.sh            # Shell script to launch training
+├── model.py          # 模型定义（PCVRHyFormer、RoPE、SwiGLU 等）
+├── dataset.py        # Parquet 数据集加载器（IterableDataset）
+├── trainer.py        # 训练循环（双重优化器 + 早停）
+├── train.py          # 训练入口（CLI 参数解析）
+├── utils.py          # 工具函数（随机种子、EarlyStopping、日志、Focal Loss）
+├── ns_groups.json    # NS 特征分组配置示例
+├── run.sh            # 训练启动脚本
 └── README.md
 ```
 
-## Requirements
+## 环境依赖
 
 - Python 3.8+
 - PyTorch >= 1.12
@@ -56,26 +56,26 @@ Input Features
 pip install torch pyarrow scikit-learn tqdm tensorboard
 ```
 
-## Data Format
+## 数据格式
 
-Training data should be placed in a directory containing:
+训练数据需要放在一个目录下，包含以下内容：
 
-1. **`*.parquet` files** — One or more Parquet files with the following columns:
+1. **`*.parquet` 文件** —— 一个或多个 Parquet 文件，包含以下列：
 
-   | Column | Type | Description |
+   | 列名 | 类型 | 说明 |
    |---|---|---|
-   | `user_int_feats_*` | int / int[] | User categorical features (e.g. user_id, age_bucket) |
-   | `user_dense_feats_*` | float / float[] | User numerical features (e.g. statistics) |
-   | `item_int_feats_*` | int / int[] | Item categorical features (e.g. item_id, category) |
-   | `item_dense_feats_*` | float / float[] | Item numerical features |
-   | `seq_a`, `seq_b`, `seq_c`, `seq_d` | int[][] | User behavior sequences (e.g. click, fav, cart, purchase) |
-   | `seq_a_len`, `seq_b_len`, ... | int | Actual length of each sequence |
-   | `seq_a_time_bucket`, `seq_b_time_bucket`, ... | int[] | Time delta buckets for each sequence position |
-   | `label` | int | Binary conversion label (0 or 1) |
+   | `user_int_feats_*` | int / int[] | 用户类别特征（如 user_id、年龄段等） |
+   | `user_dense_feats_*` | float / float[] | 用户数值特征（如统计值） |
+   | `item_int_feats_*` | int / int[] | 物品类别特征（如 item_id、类目等） |
+   | `item_dense_feats_*` | float / float[] | 物品数值特征 |
+   | `seq_a`, `seq_b`, `seq_c`, `seq_d` | int[][] | 用户行为序列（如点击、收藏、加购、购买） |
+   | `seq_a_len`, `seq_b_len`, ... | int | 各序列的实际长度 |
+   | `seq_a_time_bucket`, `seq_b_time_bucket`, ... | int[] | 各序列位置的时间间隔桶 |
+   | `label` | int | 转化标签（0 或 1） |
 
-2. **`schema.json`** — Feature metadata describing each column's `feature_id`, `offset`, and `length` in the flattened tensor.
+2. **`schema.json`** —— 特征元数据，描述每列的 `feature_id`、`offset` 和 `length`（在展平张量中的位置）。
 
-Example directory layout:
+目录结构示例：
 ```
 data/
 ├── train_001.parquet
@@ -84,15 +84,15 @@ data/
 └── schema.json
 ```
 
-## Quick Start
+## 快速开始
 
-### Option 1: Using `run.sh`
+### 方式一：使用 `run.sh`
 
 ```bash
 bash run.sh --data_dir /path/to/your/data
 ```
 
-### Option 2: Manual launch
+### 方式二：手动启动
 
 ```bash
 python train.py \
@@ -103,7 +103,7 @@ python train.py \
     --device cuda
 ```
 
-### Option 3: Using environment variables
+### 方式三：使用环境变量
 
 ```bash
 export TRAIN_DATA_PATH=/path/to/your/data
@@ -112,74 +112,74 @@ export TRAIN_LOG_PATH=./logs
 python train.py
 ```
 
-## CLI Arguments
+## 命令行参数
 
-### Paths
+### 路径配置
 
-| Argument | Default | Description |
+| 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--data_dir` | None | Training data directory (env: `TRAIN_DATA_PATH`) |
-| `--schema_path` | `<data_dir>/schema.json` | Schema JSON path |
-| `--ckpt_dir` | `./checkpoints` | Checkpoint output directory (env: `TRAIN_CKPT_PATH`) |
-| `--log_dir` | `./logs` | Log directory (env: `TRAIN_LOG_PATH`) |
+| `--data_dir` | 无 | 训练数据目录（环境变量：`TRAIN_DATA_PATH`） |
+| `--schema_path` | `<data_dir>/schema.json` | Schema JSON 路径 |
+| `--ckpt_dir` | `./checkpoints` | 模型检查点输出目录（环境变量：`TRAIN_CKPT_PATH`） |
+| `--log_dir` | `./logs` | 日志目录（环境变量：`TRAIN_LOG_PATH`） |
 
-### Training Hyperparameters
+### 训练超参数
 
-| Argument | Default | Description |
+| 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--batch_size` | 256 | Batch size |
-| `--lr` | 1e-4 | Learning rate for dense params (AdamW) |
-| `--sparse_lr` | 0.05 | Learning rate for sparse params (Adagrad) |
-| `--num_epochs` | 999 | Max epochs (early stopping typically terminates earlier) |
-| `--patience` | 5 | Early stopping patience |
-| `--seed` | 42 | Random seed |
-| `--device` | cuda/cpu | Training device |
+| `--batch_size` | 256 | 批大小 |
+| `--lr` | 1e-4 | 稠密参数学习率（AdamW） |
+| `--sparse_lr` | 0.05 | 稀疏参数学习率（Adagrad） |
+| `--num_epochs` | 999 | 最大训练轮数（通常由早停提前终止） |
+| `--patience` | 5 | 早停耐心值（验证集无改善的轮数） |
+| `--seed` | 42 | 随机种子 |
+| `--device` | cuda/cpu | 训练设备 |
 
-### Model Architecture
+### 模型架构
 
-| Argument | Default | Description |
+| 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--d_model` | 64 | Backbone hidden dimension |
-| `--emb_dim` | 64 | Per-embedding-table dimension |
-| `--num_queries` | 1 | Query tokens per sequence domain |
-| `--num_hyformer_blocks` | 2 | Number of stacked HyFormer blocks |
-| `--num_heads` | 4 | Attention heads |
-| `--seq_encoder_type` | transformer | Sequence encoder: `transformer`, `swiglu`, `longer` |
-| `--hidden_mult` | 4 | FFN inner-dim multiplier |
-| `--dropout_rate` | 0.01 | Dropout rate |
-| `--rank_mixer_mode` | full | RankMixer: `full`, `ffn_only`, `none` |
-| `--use_rope` | false | Enable RoPE positional encoding |
+| `--d_model` | 64 | 骨干网络隐藏维度 |
+| `--emb_dim` | 64 | 每个 Embedding 表的维度 |
+| `--num_queries` | 1 | 每个序列域的 Query token 数量 |
+| `--num_hyformer_blocks` | 2 | 堆叠的 HyFormer Block 层数 |
+| `--num_heads` | 4 | 注意力头数 |
+| `--seq_encoder_type` | transformer | 序列编码器：`transformer`、`swiglu`、`longer` |
+| `--hidden_mult` | 4 | FFN 内部维度倍数 |
+| `--dropout_rate` | 0.01 | Dropout 比率 |
+| `--rank_mixer_mode` | full | RankMixer 模式：`full`、`ffn_only`、`none` |
+| `--use_rope` | false | 启用 RoPE 位置编码 |
 
 ### NS Tokenizer
 
-| Argument | Default | Description |
+| 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--ns_tokenizer_type` | rankmixer | `group` or `rankmixer` |
-| `--ns_groups_json` | `./ns_groups.json` | NS feature grouping config |
-| `--user_ns_tokens` | 0 | User NS tokens in rankmixer mode (0 = auto) |
-| `--item_ns_tokens` | 0 | Item NS tokens in rankmixer mode (0 = auto) |
+| `--ns_tokenizer_type` | rankmixer | `group` 或 `rankmixer` |
+| `--ns_groups_json` | `./ns_groups.json` | NS 特征分组配置文件 |
+| `--user_ns_tokens` | 0 | rankmixer 模式下用户 NS token 数（0 = 自动） |
+| `--item_ns_tokens` | 0 | rankmixer 模式下物品 NS token 数（0 = 自动） |
 
-### Loss Function
+### 损失函数
 
-| Argument | Default | Description |
+| 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--loss_type` | bce | `bce` (BCEWithLogits) or `focal` (Focal Loss) |
-| `--focal_alpha` | 0.1 | Focal Loss alpha (only when loss_type=focal) |
-| `--focal_gamma` | 2.0 | Focal Loss gamma (only when loss_type=focal) |
+| `--loss_type` | bce | `bce`（BCEWithLogits）或 `focal`（Focal Loss） |
+| `--focal_alpha` | 0.1 | Focal Loss 的 alpha（仅 loss_type=focal 时生效） |
+| `--focal_gamma` | 2.0 | Focal Loss 的 gamma（仅 loss_type=focal 时生效） |
 
-### Data Pipeline
+### 数据管线
 
-| Argument | Default | Description |
+| 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--num_workers` | 16 | DataLoader workers |
-| `--buffer_batches` | 20 | Shuffle buffer size (in batches) |
-| `--train_ratio` | 1.0 | Fraction of training Row Groups to use |
-| `--valid_ratio` | 0.1 | Fraction of Row Groups for validation |
-| `--seq_max_lens` | seq_a:256,seq_b:256,seq_c:512,seq_d:512 | Per-domain sequence truncation |
+| `--num_workers` | 16 | DataLoader 工作进程数 |
+| `--buffer_batches` | 20 | Shuffle 缓冲区大小（以 batch 为单位） |
+| `--train_ratio` | 1.0 | 使用的训练 Row Group 比例 |
+| `--valid_ratio` | 0.1 | 用于验证的 Row Group 比例 |
+| `--seq_max_lens` | seq_a:256,seq_b:256,seq_c:512,seq_d:512 | 各序列域的最大截断长度 |
 
-## NS Groups Configuration
+## NS 分组配置
 
-`ns_groups.json` defines how integer features are grouped for the NS Tokenizer. The file has two top-level keys:
+`ns_groups.json` 定义了整数特征如何分组供 NS Tokenizer 使用。文件包含两个顶层 key：
 
 ```json
 {
@@ -194,21 +194,21 @@ python train.py
 }
 ```
 
-Values are `feature_id`s (the numeric suffix in column names like `user_int_feats_48`). `train.py` converts them to schema entry indices at runtime. If the file is missing, each feature is placed in its own singleton group.
+值为 `feature_id`（即列名中的数字后缀，如 `user_int_feats_48`）。`train.py` 在运行时将其转换为 schema entry 索引。如果文件缺失，每个特征将作为独立的单元素分组。
 
-**Token count formula**: `T = num_queries * num_sequences + num_ns`
+**Token 数量公式**：`T = num_queries * num_sequences + num_ns`
 
-For the example config: `T = 1 * 4 + (7 + 1 + 4) = 16`. `d_model` must be divisible by `T` (e.g. `d_model=64` works).
+以示例配置为例：`T = 1 * 4 + (7 + 1 + 4) = 16`。`d_model` 必须能被 `T` 整除（如 `d_model=64` 可行）。
 
-## Checkpoints
+## 模型检查点
 
-Each checkpoint directory contains:
+每个检查点目录包含：
 
-- `model.pt` — Model weights
-- `schema.json` — Copy of the feature schema (for inference)
-- `ns_groups.json` — Copy of the NS groups config (if provided)
-- `train_config.json` — Full training configuration
+- `model.pt` —— 模型权重
+- `schema.json` —— 特征 schema 副本（用于推理）
+- `ns_groups.json` —— NS 分组配置副本（如提供）
+- `train_config.json` —— 完整训练配置
 
-## License
+## 许可
 
-Private / Internal Use.
+内部使用。
