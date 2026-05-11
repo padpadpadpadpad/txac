@@ -200,7 +200,8 @@ def parse_args() -> argparse.Namespace:
     args.data_dir = os.environ.get('TRAIN_DATA_PATH', args.data_dir)
     args.ckpt_dir = os.environ.get('TRAIN_CKPT_PATH', args.ckpt_dir)
     args.log_dir = os.environ.get('TRAIN_LOG_PATH', args.log_dir)
-    args.tf_events_dir = os.environ.get('TRAIN_TF_EVENTS_PATH')
+    args.tf_events_dir = os.environ.get('TRAIN_TF_EVENTS_PATH',
+                                         os.path.join(args.ckpt_dir, '..', 'tfevents'))
 
     return args
 

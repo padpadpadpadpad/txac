@@ -33,16 +33,28 @@ class RotaryEmbedding(nn.Module):
     """
 
     def __init__(self, dim: int, max_seq_len: int = 2048, base: float = 10000.0) -> None:
+        """
+        初始化 RotaryEmbedding 模块。
+
+        Args:
+            dim: 旋转嵌入的维度。
+            max_seq_len: 用于预计算和缓存旋转嵌入的最大序列长度。
+            base: 用于频率计算的基值。
+        """
         super().__init__()
         self.dim = dim
         self.max_seq_len = max_seq_len
         self.base = base
 
-        # Precompute inv_freq: (dim // 2,)
+        # 预计算旋转嵌入的逆频率。
+        # 这是一个形状为 (dim // 2,) 的张量。
         inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        # 将 inv_freq 注册为缓冲区，但它不是模型 state_dict 的一部分。
+        # 'persistent=False' 意味着它不会被保存在检查点中。
         self.register_buffer('inv_freq', inv_freq, persistent=False)
 
-        # Precompute cache
+        # 预计算并缓存旋转嵌入的余弦和正弦值，
+        # 直到达到最大序列长度。
         self._build_cache(max_seq_len)
 
     def _build_cache(self, seq_len: int) -> None:

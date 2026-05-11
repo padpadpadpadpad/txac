@@ -706,7 +706,7 @@ def get_pcvr_data(
             rg_info.append((f, i, pf.metadata.row_group(i).num_rows))
     total_rgs = len(rg_info)
 
-    n_valid_rgs = max(1, int(total_rgs * valid_ratio))
+    n_valid_rgs = max(0, int(total_rgs * valid_ratio))
     n_train_rgs = total_rgs - n_valid_rgs
 
     # train_ratio: use only the first N% of the training Row Groups.

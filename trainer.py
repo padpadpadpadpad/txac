@@ -331,21 +331,24 @@ class PCVRHyFormerRankingTrainer:
 
             logging.info(f"Epoch {epoch}, Average Loss: {loss_sum / len(self.train_loader)}")
 
-            val_auc, val_logloss = self.evaluate(epoch=epoch)
-            self.model.train()
-            torch.cuda.empty_cache()
+            if len(self.valid_loader) > 0:
+                val_auc, val_logloss = self.evaluate(epoch=epoch)
+                self.model.train()
+                torch.cuda.empty_cache()
 
-            logging.info(f"Epoch {epoch} Validation | AUC: {val_auc}, LogLoss: {val_logloss}")
+                logging.info(f"Epoch {epoch} Validation | AUC: {val_auc}, LogLoss: {val_logloss}")
 
-            if self.writer:
-                self.writer.add_scalar('AUC/valid', val_auc, total_step)
-                self.writer.add_scalar('LogLoss/valid', val_logloss, total_step)
+                if self.writer:
+                    self.writer.add_scalar('AUC/valid', val_auc, total_step)
+                    self.writer.add_scalar('LogLoss/valid', val_logloss, total_step)
 
-            self._handle_validation_result(total_step, val_auc, val_logloss)
+                self._handle_validation_result(total_step, val_auc, val_logloss)
 
-            if self.early_stopping.early_stop:
-                logging.info(f"Early stopping at epoch {epoch}")
-                break
+                if self.early_stopping.early_stop:
+                    logging.info(f"Early stopping at epoch {epoch}")
+                    break
+            else:
+                logging.info(f"Epoch {epoch} | No validation data, skipping eval")
 
             # After the configured epoch, reinitialize high-cardinality sparse
             # params (Embeddings) as a form of cold restart to reduce overfit.
