@@ -17,3 +17,5 @@ env/
 .DS_Store
 Thumbs.db
 .claude/
+runs/
+*.parquet
